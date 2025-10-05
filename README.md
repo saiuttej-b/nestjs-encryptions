@@ -4,7 +4,7 @@
   </a>
 </div>
 
-<h3 align="center">NestJS Request Store</h3>
+<h3 align="center">NestJS Encryptions</h3>
 
 <div align="center">
   <a href="https://nestjs.com" target="_blank">
