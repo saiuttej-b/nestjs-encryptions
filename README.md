@@ -1,9 +1,3 @@
-<div align="center" style="margin-top: 1rem">
-  <a href="http://nestjs.com/" target="_blank">
-    <img src="https://nestjs.com/img/logo_text.svg" width="150" alt="Nest Logo" />
-  </a>
-</div>
-
 <h3 align="center">NestJS Encryptions</h3>
 
 <div align="center">
@@ -17,19 +11,19 @@
 Install via NPM:
 
 ```bash
-npm install @saiuttej/nestjs-mailer
+npm install @saiuttej/nestjs-encryptions
 ```
 
 Install via Yarn:
 
 ```bash
-yarn add @saiuttej/nestjs-mailer
+yarn add @saiuttej/nestjs-encryptions
 ```
 
 Install via PNPM:
 
 ```bash
-pnpm add @saiuttej/nestjs-mailer
+pnpm add @saiuttej/nestjs-encryptions
 ```
 
 ## Author

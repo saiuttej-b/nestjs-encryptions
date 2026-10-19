@@ -1,6 +1,6 @@
 {
   "name": "@saiuttej/nestjs-encryptions",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A NestJS module for encrypting and decrypting data using AES-256-CBC algorithm. Supports both synchronous and asynchronous operations and Hasher class for hashing and verifying data using bcrypt.",
   "author": "B Sai Uttej",
   "license": "MIT",
