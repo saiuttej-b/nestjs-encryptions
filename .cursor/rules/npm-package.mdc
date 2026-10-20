@@ -1,0 +1,18 @@
+---
+description: npm package metadata, changelog, and release rules
+alwaysApply: true
+---
+
+# npm package
+
+This is a published CommonJS library, `@saiuttej/nestjs-encryptions`. Keep the package consumable without reading the repo.
+
+- Preserve `"type": "commonjs"`, `main`, `types`, `sideEffects: false`, and the `exports` map pointing `types` and `default` at `dist`.
+- `engines.node` stays `>=20`. `@nestjs/common` stays a peer dependency for Nest 10 through 12, not a runtime dependency. `bcrypt` stays a peer dependency. The host app supplies both.
+- `files` publishes `dist/**/*`, `README.md`, `CHANGELOG.md`, and `LICENSE` only. Do not add tests, configs, or source maps as extra top-level entries unless they already live under `dist`.
+- `prepublishOnly` builds. Do not restore `prepublish`.
+- User-facing API changes need a `CHANGELOG.md` entry and a README update when setup or behavior changes.
+- Do not publish, tag, or push unless the user asks. Publishing runs on push to `main` with `pnpm publish --access public --provenance`. Authenticate with GitHub OIDC (`id-token: write`), not `NODE_AUTH_TOKEN`.
+- CI on pull requests and on `main` / `develop` must keep lint, build, and `pnpm run test:cov`.
+- Do not commit secrets, `.env` files, or tokens. Do not change git config.
+- Add a dependency with pnpm so `pnpm-lock.yaml` updates. Prefer a peer dependency when the host app must supply Nest, bcrypt, or another framework package.

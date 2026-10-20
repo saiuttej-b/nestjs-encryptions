@@ -4,12 +4,11 @@ import { EncryptionService } from './services/encryption.service';
 import { EncryptionAsyncOptions, EncryptionOptions } from './types/types';
 
 /**
- * Encryption module
+ * Registers `EncryptionService`.
+ *
+ * `forRoot` and `forRootAsync` are global. `register` and `registerAsync` are not.
  */
-@Module({
-  providers: [EncryptionService],
-  exports: [EncryptionService],
-})
+@Module({})
 export class EncryptionsModule {
   private static createModule(options: EncryptionOptions): DynamicModule {
     return {
@@ -42,44 +41,32 @@ export class EncryptionsModule {
   }
 
   /**
-   * Creates a global encryption module with the provided options.
-   *
-   * @param {EncryptionOptions} options - Encryption options.
-   * @returns {DynamicModule} - The created encryption module.
+   * Creates a global encryption module.
    */
   static forRoot(options: EncryptionOptions): DynamicModule {
-    const module = this.createModule(options);
-    module.global = true;
-    return module;
+    const encryptionModule = this.createModule(options);
+    encryptionModule.global = true;
+    return encryptionModule;
   }
 
   /**
-   * Creates a global encryption module with the provided async options.
-   *
-   * @param {EncryptionAsyncOptions} options - Encryption options.
-   * @returns {Promise<DynamicModule>} - The created encryption module.
+   * Creates a global encryption module from an async factory.
    */
   static forRootAsync(options: EncryptionAsyncOptions): DynamicModule {
-    const module = this.createAsyncModule(options);
-    module.global = true;
-    return module;
+    const encryptionModule = this.createAsyncModule(options);
+    encryptionModule.global = true;
+    return encryptionModule;
   }
 
   /**
-   * Registers the encryption module with the provided options.
-   *
-   * @param {EncryptionOptions} options - Encryption options.
-   * @returns {DynamicModule} - The registered encryption module.
+   * Registers an encryption module with the importing module.
    */
   static register(options: EncryptionOptions): DynamicModule {
     return this.createModule(options);
   }
 
   /**
-   * Registers the encryption module with the provided async options.
-   *
-   * @param {EncryptionAsyncOptions} options - Encryption options.
-   * @returns {Promise<DynamicModule>} - The registered encryption module.
+   * Registers an encryption module from an async factory.
    */
   static registerAsync(options: EncryptionAsyncOptions): DynamicModule {
     return this.createAsyncModule(options);

@@ -1,0 +1,19 @@
+---
+description: Format and lint TypeScript after every code change
+alwaysApply: true
+---
+
+# Format and lint
+
+After editing `src/**/*.ts`, format those files and run lint before finishing. Do not leave a change that fails either command.
+
+```bash
+pnpm exec prettier --write "src/**/*.ts"
+pnpm run lint
+```
+
+- `pnpm run lint` must stay a check. It does not pass `--fix`.
+- Use `pnpm run lint:fix` only to apply ESLint fixes, then run `pnpm run lint` again.
+- Match `.prettierrc`: single quotes, trailing commas, print width 100, `endOfLine: auto`.
+- Specs live in `src/**/__tests__/**/*.spec.ts`. Format and lint them too.
+- If behavior changed, also run `pnpm run test:cov`. Coverage must stay at 100% statements, branches, functions, and lines.

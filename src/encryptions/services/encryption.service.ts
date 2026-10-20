@@ -1,133 +1,151 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { compare, hash } from 'bcrypt';
+import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { ENCRYPTION_OPTIONS } from '../constants/encryptions.constants';
+import { DecryptionFailedError, InvalidCiphertextError } from '../encryptions.errors';
 import type { EncryptionOptions } from '../types/types';
 
-/**
- * Provides encryption and hashing services.
+const GCM_ALGORITHM = 'aes-256-gcm';
+const CBC_ALGORITHM = 'aes-256-cbc';
+const GCM_IV_LENGTH = 12;
+const CBC_IV_LENGTH = 16;
+const AUTH_TAG_LENGTH = 16;
+const KEY_CHARACTER_LIMIT = 32;
+const KEY_ERROR = 'Invalid encryption key. Key must be at most 32 characters long';
 
- * This service encrypts and decrypts strings using the AES-256-CBC algorithm. 
- * It also provides functions for hashing and comparing strings using bcrypt.
+/**
+ * Encrypts with AES-256-GCM, decrypts GCM and legacy CBC payloads, and hashes with bcrypt.
  */
 @Injectable()
-export class EncryptionService {
-  /**
-   * The encryption algorithm used by the service.
-   *
-   * @private
-   * @readonly
-   * @memberof EncryptionService
-   * @type {string}
-   */
-  private readonly algorithm: string = 'aes-256-cbc';
-
-  /**
-   * Creates a new instance of the EncryptionService.
-   *
-   * @param {EncryptionOptions} options - Encryption options.
-   */
+export class EncryptionService implements OnModuleInit {
   constructor(@Inject(ENCRYPTION_OPTIONS) private readonly options: EncryptionOptions) {}
 
   /**
-   * Validates the encryption key.
-   *
-   * The key must be at most 32 characters long.
-   *
-   * @protected
+   * Rejects a module secret longer than 32 characters.
    */
-  protected onModuleInit() {
-    if (this.options.secret.length > 32) {
-      const message = 'Invalid encryption key. Key must be at most 32 characters long';
-      throw new Error(message);
-    }
+  onModuleInit(): void {
+    this.assertKeyLength(this.options.secret);
   }
 
   /**
-   * Gets the encryption key.
+   * Encrypts `value` with AES-256-GCM.
    *
-   * - Uses the key from the options if provided.
-   * - Otherwise, uses the key from the config service.
-   * - Pads the key with 0s to ensure it is 32 characters long.
-   * - Throws an error if no key is provided.
-   *
-   * @param {string} [options?.key] - Optional encryption key from options.
-   * @returns {string} - 32-character encryption key.
-   */
-  private getKey(key?: string): string {
-    if (!key) key = this.options.secret;
-    if (key.length > 32) {
-      const message = 'Invalid encryption key. Key must be at most 32 characters long';
-      throw new Error(message);
-    }
-
-    return key.padStart(32, '0');
-  }
-
-  /**
-   * Encrypts the given string using the AES-256-CBC algorithm.
-   *
-   * @param {string} value - The string to encrypt.
-   * @param {EncryptionOptions} [options] - Optional encryption options (e.g., custom key).
-   * @returns {string} - The encrypted string.
+   * The payload is `v1:<iv>:<authTag>:<ciphertext>`, with each segment base64-encoded.
+   * `options.key` overrides the module secret for this call.
    */
   encrypt(value: string, options?: { key?: string }): string {
     const key = this.getKey(options?.key);
-    const iv = crypto.randomBytes(16);
+    const iv = crypto.randomBytes(GCM_IV_LENGTH);
+    const cipher = crypto.createCipheriv(GCM_ALGORITHM, key, iv);
+    const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
 
-    const cipher = crypto.createCipheriv(this.algorithm, key, iv);
-    let encrypted = cipher.update(value, 'utf8', 'base64');
-    encrypted += cipher.final('base64');
-    return `${iv.toString('base64')}:${encrypted}`;
+    return [
+      'v1',
+      iv.toString('base64'),
+      authTag.toString('base64'),
+      encrypted.toString('base64'),
+    ].join(':');
   }
 
   /**
-   * Decrypts the given string using the AES-256-CBC algorithm.
+   * Decrypts a v1 AES-256-GCM payload or a legacy AES-256-CBC payload.
    *
-   * @param {string} encryptedValue - The encrypted string.
-   * @param {DecryptionOptions} [options] - Optional decryption options (e.g., custom key, suppressError).
-   * @returns {string | null} - The decrypted string, or null if decryption fails and `suppressError` is true.
+   * Returns null when `suppressError` is true and the payload is invalid or authentication fails.
+   * A key longer than 32 characters still throws.
    */
   decrypt(
     encryptedValue: string,
     options?: { key?: string; suppressError?: boolean },
   ): string | null {
-    const key = this.getKey(options?.key);
-
-    const [ivHex, encrypted] = encryptedValue.split(':');
-    const iv = Buffer.from(ivHex, 'base64');
-
     try {
-      const decipher = crypto.createDecipheriv(this.algorithm, key, iv);
-      let decrypted = decipher.update(encrypted, 'base64', 'utf8');
-      decrypted += decipher.final('utf8');
-      return decrypted;
-    } catch (error: any) {
-      if (options?.suppressError) return null;
+      const key = this.getKey(options?.key);
+      if (encryptedValue.startsWith('v1:')) {
+        return this.decryptGcm(encryptedValue, key);
+      }
+
+      return this.decryptLegacyCbc(encryptedValue, key);
+    } catch (error) {
+      if (
+        options?.suppressError &&
+        (error instanceof InvalidCiphertextError || error instanceof DecryptionFailedError)
+      ) {
+        return null;
+      }
 
       throw error;
     }
   }
 
   /**
-   * Hashes the given string using bcrypt.
-   *
-   * @param {string} value - The string to hash.
-   * @param {number} [saltOrRounds=10] - The number of rounds to hash the value (default: 10).
-   * @returns {Promise<string>} - The hashed string.
+   * Hashes `value` with bcrypt. `salt` defaults to 10 rounds. An explicit `0` is forwarded.
    */
   hash(value: string, salt?: number): Promise<string> {
-    return hash(value, salt || 10);
+    return bcrypt.hash(value, salt ?? 10);
   }
 
   /**
-   * Compares the given string with a hashed string using bcrypt.
-   *
-   * @param {string} value - The string to compare.
-   * @param {string} hash - The hashed string.
-   * @returns {Promise<boolean>} - True if the string matches the hash, false otherwise.
+   * Returns whether `value` matches a bcrypt hash.
    */
-  compareHash(value: string, hash: string): Promise<boolean> {
-    return compare(value, hash);
+  compareHash(value: string, hashed: string): Promise<boolean> {
+    return bcrypt.compare(value, hashed);
+  }
+
+  private getKey(key?: string): string {
+    if (!key) {
+      key = this.options.secret;
+    }
+
+    this.assertKeyLength(key);
+    return key.padStart(KEY_CHARACTER_LIMIT, '0');
+  }
+
+  private assertKeyLength(key: string): void {
+    if (key.length > KEY_CHARACTER_LIMIT) {
+      throw new Error(KEY_ERROR);
+    }
+  }
+
+  private decryptGcm(payload: string, key: string): string {
+    const parts = payload.split(':');
+    if (parts.length !== 4) {
+      throw new InvalidCiphertextError();
+    }
+
+    const iv = Buffer.from(parts[1], 'base64');
+    const authTag = Buffer.from(parts[2], 'base64');
+    const encrypted = Buffer.from(parts[3], 'base64');
+    if (iv.length !== GCM_IV_LENGTH || authTag.length !== AUTH_TAG_LENGTH) {
+      throw new InvalidCiphertextError();
+    }
+
+    try {
+      const decipher = crypto.createDecipheriv(GCM_ALGORITHM, key, iv);
+      decipher.setAuthTag(authTag);
+      const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
+      return decrypted.toString('utf8');
+    } catch {
+      throw new DecryptionFailedError();
+    }
+  }
+
+  private decryptLegacyCbc(payload: string, key: string): string {
+    const parts = payload.split(':');
+    if (parts.length !== 2) {
+      throw new InvalidCiphertextError();
+    }
+
+    const iv = Buffer.from(parts[0], 'base64');
+    if (iv.length !== CBC_IV_LENGTH || parts[1].length === 0) {
+      throw new InvalidCiphertextError();
+    }
+
+    try {
+      const decipher = crypto.createDecipheriv(CBC_ALGORITHM, key, iv);
+      const decrypted = Buffer.concat([decipher.update(parts[1], 'base64'), decipher.final()]);
+      return decrypted.toString('utf8');
+    } catch {
+      throw new DecryptionFailedError();
+    }
   }
 }

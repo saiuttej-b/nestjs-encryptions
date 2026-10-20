@@ -1,7 +1,7 @@
 import { ModuleMetadata } from '@nestjs/common';
 
 /**
- * Encryption options
+ * Module options. `secret` must be at most 32 characters.
  */
 export type EncryptionOptions = {
   secret: string;

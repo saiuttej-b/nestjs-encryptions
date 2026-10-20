@@ -1,0 +1,27 @@
+---
+description: NestJS encryptions API and test conventions
+globs: src/**/*.ts
+alwaysApply: false
+---
+
+# Library practices
+
+`encrypt` writes `v1` AES-256-GCM only: `v1:<iv>:<authTag>:<ciphertext>`. The IV is 12 bytes and the auth tag is 16 bytes. `decrypt` still reads legacy AES-256-CBC payloads (`<iv>:<ciphertext>`, 16-byte IV).
+
+- The module secret and a per-call `key` stay at most 32 characters. `getKey` left-pads a shorter value with `0`.
+- `suppressError: true` returns `null` for `InvalidCiphertextError` and `DecryptionFailedError`. A key longer than 32 characters still throws.
+- `hash` uses `salt ?? 10`, so an explicit `0` is forwarded to bcrypt.
+- `forRoot` and `forRootAsync` set `global: true`. `register` and `registerAsync` do not.
+- The class decorator stays `@Module({})`. Providers are added only inside the static registration methods.
+
+Public exports belong in `src/encryptions/index.ts`: the module, the service, the options types, and the two errors. Do not export `ENCRYPTION_OPTIONS`.
+
+```typescript
+// Prefer this
+export { EncryptionService } from './services/encryption.service';
+
+// Not this
+export { ENCRYPTION_OPTIONS } from './constants/encryptions.constants';
+```
+
+Put tests in `src/encryptions/__tests__/`, not beside source files. Import the public API from `src/index.ts`. Keep `strict` TypeScript. Build with `tsc -p tsconfig.build.json` so specs are not emitted.
